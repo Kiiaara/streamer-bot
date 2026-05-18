@@ -1,0 +1,16 @@
+# Стартовый конфиг - только HTTP, без SSL.
+# Используется один раз для получения первого сертификата Let's Encrypt.
+# После успешного certbot - переименовать admin.conf обратно и перезапустить nginx.
+server {
+    listen 80;
+    server_name admin.travobot-workflow.ru;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 200 "Admin server is being configured. Please wait.";
+        add_header Content-Type text/plain;
+    }
+}

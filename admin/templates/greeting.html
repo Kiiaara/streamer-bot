@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Приветствие — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Приветствие бота</h1>
+<p class="text-slate-400 text-sm mb-4">
+  Это сообщение юзер видит когда первый раз пишет боту <code>/start</code> или вызывает главное меню.
+</p>
+
+<form method="post" action="/greeting" class="space-y-4 max-w-2xl">
+  <textarea name="value" rows="6"
+            class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-3 font-mono">{{ value }}</textarea>
+  <div class="text-xs text-slate-500">
+    Можно использовать HTML-теги: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;a href="..."&gt;ссылка&lt;/a&gt; и эмодзи.
+  </div>
+  <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded font-semibold">Сохранить</button>
+</form>
+{% endblock %}

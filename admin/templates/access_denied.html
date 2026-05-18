@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Доступ запрещён{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+  <div class="bg-slate-800 border border-red-900 rounded-2xl p-10 max-w-md w-full text-center">
+    <div class="text-2xl mb-2 text-red-400">Доступ запрещён</div>
+    <div class="text-slate-400 mb-6">Твой Telegram-аккаунт не в whitelist админки.</div>
+    <a href="/login" class="text-emerald-400 hover:underline">← Вернуться к входу</a>
+  </div>
+</div>
+{% endblock %}

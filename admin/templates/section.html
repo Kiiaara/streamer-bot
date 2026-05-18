@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}{{ current_section }} — Травобот{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold">{{ current_section }}</h1>
+  <div class="flex gap-2">
+    {% if section_obj and user.role == 'admin' %}
+    <a href="/sections-manage/{{ section_obj.id }}/edit"
+       class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm">Настроить раздел</a>
+    {% endif %}
+    <a href="/item/new?section={{ current_section }}"
+       class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-semibold">+ Добавить</a>
+  </div>
+</div>
+
+{% if section_obj and (section_obj.description or section_obj.image) %}
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6 flex gap-4 items-start">
+  {% if section_obj.image %}
+  <img src="/uploads/{{ section_obj.image }}" class="w-32 h-32 object-cover rounded-lg flex-shrink-0" />
+  {% endif %}
+  <div class="text-sm text-slate-200 [&_b]:font-bold [&_i]:italic [&_u]:underline [&_s]:line-through [&_code]:font-mono [&_code]:bg-slate-700 [&_code]:px-1 [&_code]:rounded">
+    {{ section_obj.description|safe if section_obj.description else '<span class="text-slate-500">Описание раздела пока не задано</span>'|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if categories %}
+<div class="mb-6">
+  <div class="text-sm text-slate-400 mb-2">Категории и подкатегории в этом разделе:</div>
+  <div class="flex flex-wrap gap-2">
+    {% for c in categories %}
+    <a href="/section/{{ current_section }}/category/{{ c.category|urlencode }}/edit{% if c.subcategory %}?subcategory={{ c.subcategory|urlencode }}{% endif %}"
+       class="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-2 text-sm flex items-center gap-2">
+      {% if c.image %}
+        <img src="/uploads/{{ c.image }}" class="w-6 h-6 rounded object-cover" />
+      {% endif %}
+      <span class="font-medium">{{ c.category }}</span>
+      {% if c.subcategory %}
+        <span class="text-slate-500">→</span>
+        <span>{{ c.subcategory }}</span>
+      {% endif %}
+      {% if c.description %}
+        <span class="text-emerald-500 text-xs" title="Есть описание">●</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  <div class="text-xs text-slate-500 mt-2">Кликни чтобы добавить описание и картинку. ● — уже заполнено.</div>
+</div>
+{% endif %}
+
+{% if items %}
+{# Группируем по category. Записи без category - в группу "Без категории" в конце #}
+{% set groups = {} %}
+{% set order = [] %}
+{% for item in items %}
+  {% set gk = item.category or "" %}
+  {% if gk not in groups %}
+    {% set _ = order.append(gk) %}
+    {% set _ = groups.update({gk: []}) %}
+  {% endif %}
+  {% set _ = groups[gk].append(item) %}
+{% endfor %}
+
+<div x-data="groupsState('{{ current_section|e }}')" class="space-y-3" id="groups-root">
+  {% for gk in order %}
+    {% set group_items = groups[gk] %}
+    {% set gk_key = gk if gk else '__none__' %}
+    <div class="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
+      <button type="button" @click="toggle('{{ gk_key|e }}')"
+              class="w-full flex items-center justify-between px-4 py-3 bg-slate-800 hover:bg-slate-700 transition">
+        <div class="flex items-center gap-3">
+          <span x-text="open['{{ gk_key|e }}'] ? '▼' : '▶'" class="text-slate-400"></span>
+          <span class="font-semibold">{{ gk if gk else 'Без категории' }}</span>
+          <span class="text-slate-500 text-sm">{{ group_items|length }} {{ 'запись' if group_items|length == 1 else 'записей' }}</span>
+        </div>
+      </button>
+      <ul x-show="open['{{ gk_key|e }}']" x-cloak
+          data-group="{{ gk }}"
+          class="items-list space-y-2 p-3 border-t border-slate-700">
+        {% for item in group_items %}
+        <li data-id="{{ item.id }}"
+            class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-center gap-3 hover:border-slate-500 {% if item.hidden %}opacity-50{% endif %}">
+          <div class="cursor-grab text-slate-500 select-none drag-handle">⋮⋮</div>
+          {% if item.image %}
+            <img src="/uploads/{{ item.image }}" class="w-12 h-12 rounded object-cover" />
+          {% else %}
+            <div class="w-12 h-12 rounded bg-slate-700 flex items-center justify-center text-slate-500 text-xs">нет фото</div>
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold truncate flex items-center gap-2">{{ item.title }}{% if item.hidden %}<span class="bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded">скрыт</span>{% endif %}</div>
+            <div class="text-xs text-slate-400 truncate">
+              {% if item.subcategory %}<span class="bg-slate-700 px-2 py-0.5 rounded mr-1">{{ item.subcategory }}</span>{% endif %}
+              {% if item.url %}{{ item.url }}{% else %}<span class="text-slate-600">без ссылки</span>{% endif %}
+            </div>
+            {% if item.description %}
+            <div class="text-xs text-slate-500 mt-1 line-clamp-2">
+              {{ item.description|striptags|truncate(140) }}
+            </div>
+            {% endif %}
+          </div>
+          <a href="/item/{{ item.id }}/edit"
+             class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm">Изменить</a>
+          <form method="post" action="/item/{{ item.id }}/delete" onsubmit="return confirm('Удалить «{{ item.title }}»?');" class="m-0">
+            <button class="bg-red-900 hover:bg-red-800 text-red-200 px-3 py-1 rounded text-sm" type="submit">Удалить</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-slate-500 text-center py-10">Пока пусто. Добавь первую запись.</div>
+{% endif %}
+
+<script>
+  // Состояние аккордеонов раздела сохраняем в localStorage по ключу секции,
+  // чтобы при возврате после редактирования открытые группы остались открытыми.
+  function groupsState(sectionName) {
+    const storageKey = 'admin:groups:' + sectionName;
+    let initial = {};
+    try { initial = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) {}
+    return {
+      open: initial,
+      toggle(key) {
+        this.open[key] = !this.open[key];
+        localStorage.setItem(storageKey, JSON.stringify(this.open));
+      },
+    };
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+  // Каждая группа - свой Sortable, между группами перетаскивать нельзя
+  document.querySelectorAll('.items-list').forEach(list => {
+    Sortable.create(list, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: async () => {
+        // Собираем порядок ВСЕХ записей раздела в правильной последовательности (по группам как они идут)
+        const allIds = [];
+        document.querySelectorAll('.items-list').forEach(g => {
+          g.querySelectorAll('li[data-id]').forEach(li => allIds.push(li.dataset.id));
+        });
+        await fetch('/section/{{ current_section }}/reorder', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order: allIds}),
+        });
+      },
+    });
+  });
+</script>
+{% endblock %}

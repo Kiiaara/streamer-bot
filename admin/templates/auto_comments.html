@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Авто-комменты — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Авто-комменты в группах обсуждения</h1>
+
+<div class="space-y-3 mb-8">
+  {% for it in items %}
+  <details id="ac-{{ it.chat_id }}" class="bg-slate-800 border border-slate-700 rounded-xl p-4" data-chat="{{ it.chat_id }}">
+    <summary class="cursor-pointer flex items-center justify-between">
+      <div>
+        <span class="font-semibold">{{ it.name or '(без названия)' }}</span>
+        <span class="text-slate-400 text-sm ml-2">{{ it.chat_id }}</span>
+        {% if it.topic %}<span class="bg-slate-700 px-2 py-0.5 rounded ml-2 text-xs">{{ it.topic }}</span>{% endif %}
+        {% if not it.enabled %}<span class="bg-red-900 text-red-200 px-2 py-0.5 rounded ml-2 text-xs">выключен</span>{% endif %}
+      </div>
+    </summary>
+    <form method="post" action="/auto-comments" class="mt-4 space-y-3">
+      <input type="hidden" name="chat_id" value="{{ it.chat_id }}" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="name" value="{{ it.name }}" placeholder="Название (для тебя)"
+               class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+        <input name="topic" value="{{ it.topic }}" placeholder="Тематика (dota / warhammer / ...)"
+               class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Chat ID <span class="text-slate-600">(изменить - введи новый)</span></label>
+        <input name="new_chat_id" type="number" placeholder="{{ it.chat_id }}"
+               class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm" />
+      </div>
+      <textarea name="text" rows="4" placeholder="Текст коммента (можно HTML: <b>, <i>, <u>, <s>, <code>, <a href>, <tg-spoiler>)"
+                class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm">{{ it.text }}</textarea>
+      <textarea name="buttons" rows="3" placeholder="Кнопки - по одной в строке: Заголовок | https://url"
+                class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm">{{ it.buttons }}</textarea>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="enabled" value="true" {% if it.enabled %}checked{% endif %} />
+        Включён
+      </label>
+      <div class="flex gap-2">
+        <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Сохранить</button>
+        <button class="bg-red-900 hover:bg-red-800 text-red-200 px-4 py-2 rounded" formaction="/auto-comments/{{ it.chat_id }}/delete"
+                onclick="return confirm('Удалить настройку для {{ it.chat_id }}?');">Удалить</button>
+      </div>
+    </form>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+  <h2 class="text-lg font-semibold mb-3">Добавить новую группу</h2>
+  <form method="post" action="/auto-comments" class="space-y-3">
+    <div class="grid grid-cols-3 gap-3">
+      <input name="chat_id" type="number" required placeholder="chat_id (например -1001234567890)"
+             class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+      <input name="name" placeholder="Название (для тебя)"
+             class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+      <input name="topic" placeholder="Тематика"
+             class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    </div>
+    <textarea name="text" rows="4" placeholder="Текст коммента"
+              class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm"></textarea>
+    <textarea name="buttons" rows="3" placeholder="Кнопки - по одной в строке: Заголовок | https://url"
+              class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm"></textarea>
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="true" checked /> Включён</label>
+    <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Создать</button>
+  </form>
+</div>
+<script>
+  const AC_KEY = 'admin:autocomments:open';
+  let openSet = new Set(JSON.parse(localStorage.getItem(AC_KEY) || '[]'));
+
+  // Если только что сохранили - закрываем этот автокоммент
+  const saved = new URLSearchParams(location.search).get('saved');
+  if (saved) openSet.delete(saved);
+
+  document.querySelectorAll('details[data-chat]').forEach(el => {
+    const id = el.dataset.chat;
+    if (openSet.has(id)) el.open = true;
+    el.addEventListener('toggle', () => {
+      if (el.open) openSet.add(id); else openSet.delete(id);
+      localStorage.setItem(AC_KEY, JSON.stringify([...openSet]));
+    });
+  });
+</script>
+{% endblock %}

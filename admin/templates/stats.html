@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Статистика — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Статистика</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <div class="text-3xl font-bold text-emerald-400">{{ week_users }}</div>
+    <div class="text-slate-400 text-sm">юзеров за 7 дней</div>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <div class="text-3xl font-bold text-emerald-400">{{ month_users }}</div>
+    <div class="text-slate-400 text-sm">юзеров за 30 дней</div>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <div class="text-3xl font-bold">{{ month_clicks }}</div>
+    <div class="text-slate-400 text-sm">кликов за 30 дней</div>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <div class="text-3xl font-bold">{{ month_searches }}</div>
+    <div class="text-slate-400 text-sm">свободных вопросов за 30 дней</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Активность по дням</h2>
+    <canvas id="dailyChart" height="180"></canvas>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Распределение по часам (МСК)</h2>
+    <canvas id="hourChart" height="180"></canvas>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Топ разделов</h2>
+    <ol class="space-y-1 text-sm">
+      {% for name, cnt in top_sections %}
+      <li class="flex justify-between"><span>{{ loop.index }}. {{ name }}</span><span class="text-slate-400">{{ cnt }}</span></li>
+      {% endfor %}
+      {% if not top_sections %}<li class="text-slate-500">пока пусто</li>{% endif %}
+    </ol>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Топ категорий</h2>
+    <ol class="space-y-1 text-sm">
+      {% for name, cnt in top_categories %}
+      <li class="flex justify-between gap-2"><span class="truncate">{{ loop.index }}. {{ name }}</span><span class="text-slate-400 flex-shrink-0">{{ cnt }}</span></li>
+      {% endfor %}
+      {% if not top_categories %}<li class="text-slate-500">пока пусто</li>{% endif %}
+    </ol>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Топ ссылок</h2>
+    <ol class="space-y-1 text-sm">
+      {% for url, cnt in top_links %}
+      <li class="flex justify-between gap-2"><a href="{{ url }}" target="_blank" class="truncate hover:text-emerald-400">{{ loop.index }}. {{ url }}</a><span class="text-slate-400 flex-shrink-0">{{ cnt }}</span></li>
+      {% endfor %}
+      {% if not top_links %}<li class="text-slate-500">пока пусто</li>{% endif %}
+    </ol>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Топ слов в свободных вопросах</h2>
+    <div class="flex flex-wrap gap-2">
+      {% for term, cnt in top_searches %}
+      <span class="bg-slate-700 rounded px-2 py-1 text-sm">{{ term }} <span class="text-slate-400">×{{ cnt }}</span></span>
+      {% endfor %}
+      {% if not top_searches %}<span class="text-slate-500 text-sm">пока пусто</span>{% endif %}
+    </div>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+    <h2 class="font-semibold mb-3">Авто-комменты</h2>
+    <div class="text-3xl font-bold">{{ month_autocomments }}</div>
+    <div class="text-slate-400 text-sm">всего написано за 30 дней</div>
+  </div>
+</div>
+
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+  <h2 class="font-semibold mb-3">Последние свободные вопросы (50)</h2>
+  <ul class="space-y-3 text-sm max-h-[600px] overflow-y-auto">
+    {% for q in recent_searches %}
+    <li class="border-b border-slate-700/50 pb-2">
+      <div class="flex justify-between items-start gap-2 mb-1">
+        <a href="tg://user?id={{ q.user_id }}" class="text-emerald-400 hover:underline text-xs">id {{ q.user_id }}</a>
+        <span class="text-slate-500 text-xs flex-shrink-0">{{ to_msk(q.created_at) }}</span>
+      </div>
+      <div class="text-slate-200 whitespace-pre-wrap break-words">{{ q.target }}</div>
+    </li>
+    {% endfor %}
+    {% if not recent_searches %}<li class="text-slate-500">пока пусто</li>{% endif %}
+  </ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  const dailyData = {{ history|tojson }};
+  const hourData = {{ by_hour|tojson }};
+
+  new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+      labels: dailyData.map(d => d.date),
+      datasets: [
+        {label: 'Юзеров', data: dailyData.map(d => d.users), borderColor: '#10b981', backgroundColor: '#10b98144', tension: 0.3},
+        {label: 'Кликов', data: dailyData.map(d => d.clicks), borderColor: '#60a5fa', backgroundColor: '#60a5fa44', tension: 0.3},
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {legend: {labels: {color: '#cbd5e1'}}},
+      scales: {
+        x: {ticks: {color: '#94a3b8'}, grid: {color: '#33415544'}},
+        y: {ticks: {color: '#94a3b8'}, grid: {color: '#33415544'}},
+      },
+    },
+  });
+
+  new Chart(document.getElementById('hourChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(hourData).map(h => h + ':00'),
+      datasets: [{label: 'События', data: Object.values(hourData), backgroundColor: '#10b981'}],
+    },
+    options: {
+      responsive: true,
+      plugins: {legend: {display: false}},
+      scales: {
+        x: {ticks: {color: '#94a3b8'}, grid: {color: '#33415544'}},
+        y: {ticks: {color: '#94a3b8'}, grid: {color: '#33415544'}},
+      },
+    },
+  });
+</script>
+{% endblock %}

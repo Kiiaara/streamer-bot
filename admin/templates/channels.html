@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Каналы — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Привязка каналов к категориям</h1>
+<p class="text-slate-400 mb-4 text-sm">
+  Если бот добавлен в группу обсуждения тематического канала, можно ограничить меню только нужным разделом.
+  Категория «все» (или пусто) - показывается полное меню.
+</p>
+
+<div class="space-y-2 mb-8">
+  {% for it in items %}
+  <form method="post" action="/channels" class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-center gap-3">
+    <input type="hidden" name="chat_id" value="{{ it.chat_id }}" />
+    <span class="text-slate-500 text-sm">{{ it.chat_id }}</span>
+    <input name="name" value="{{ it.name }}" placeholder="Название"
+           class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <input name="category" value="{{ it.category }}" placeholder="Категория"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2 w-40" />
+    <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm" type="submit">Сохранить</button>
+    <button class="bg-red-900 hover:bg-red-800 text-red-200 px-3 py-2 rounded text-sm"
+            formaction="/channels/{{ it.chat_id }}/delete"
+            onclick="return confirm('Удалить?');">Удалить</button>
+  </form>
+  {% endfor %}
+</div>
+
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+  <h2 class="text-lg font-semibold mb-3">Добавить канал</h2>
+  <form method="post" action="/channels" class="grid grid-cols-3 gap-3">
+    <input name="chat_id" type="number" required placeholder="chat_id"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <input name="name" placeholder="Название"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <input name="category" placeholder="Категория (Dota 2 / Warhammer / все)"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <button class="col-span-3 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Создать</button>
+  </form>
+</div>
+{% endblock %}

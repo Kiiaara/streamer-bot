@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Настройки — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Настройки бота</h1>
+<p class="text-slate-400 mb-4 text-sm">
+  Здесь хранятся произвольные пары ключ → значение. Используются для приветствия (<code>greeting</code>),
+  описаний разделов (<code>section_desc.Соцсети</code>), описаний подкатегорий (<code>section_desc.Игры.Dota 2</code>) и т.д.
+</p>
+
+<div class="space-y-2 mb-8">
+  {% for it in items %}
+  <form method="post" action="/settings" class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-start gap-3">
+    <input type="hidden" name="key" value="{{ it.key }}" />
+    <div class="font-mono text-sm text-emerald-300 w-72 pt-2 break-all">{{ it.key }}</div>
+    <textarea name="value" rows="2"
+              class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm">{{ it.value }}</textarea>
+    <div class="flex flex-col gap-1">
+      <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm" type="submit">Сохранить</button>
+      <button class="bg-red-900 hover:bg-red-800 text-red-200 px-3 py-2 rounded text-sm"
+              formaction="/settings/{{ it.key }}/delete"
+              onclick="return confirm('Удалить «{{ it.key }}»?');">×</button>
+    </div>
+  </form>
+  {% endfor %}
+</div>
+
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+  <h2 class="text-lg font-semibold mb-3">Добавить ключ</h2>
+  <form method="post" action="/settings" class="space-y-3">
+    <input name="key" required placeholder="Например: section_desc.Соцсети"
+           class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm" />
+    <textarea name="value" rows="3" placeholder="Значение..."
+              class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm"></textarea>
+    <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Создать</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Юзеры — Травобот{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Юзеры админки</h1>
+
+<div class="space-y-2 mb-8">
+  {% for u in items %}
+  <form method="post" action="/users" class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-center gap-3">
+    <input type="hidden" name="telegram_id" value="{{ u.telegram_id }}" />
+    {% if u.photo_url %}
+    <img src="{{ u.photo_url }}" class="w-10 h-10 rounded-full" />
+    {% else %}
+    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-500 text-xs">?</div>
+    {% endif %}
+    <div class="flex-1">
+      <div class="font-semibold">@{{ u.username or '(нет username)' }}</div>
+      <div class="text-slate-400 text-sm">{{ u.first_name }} <span class="ml-2 text-slate-500">{{ u.telegram_id }}</span></div>
+    </div>
+    <input name="username" value="{{ u.username }}" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 w-40 text-sm" />
+    <select name="role" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm">
+      <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>admin</option>
+      <option value="editor" {% if u.role == 'editor' %}selected{% endif %}>editor</option>
+    </select>
+    <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm" type="submit">Сохранить</button>
+    {% if u.telegram_id != user.telegram_id %}
+    <button class="bg-red-900 hover:bg-red-800 text-red-200 px-3 py-2 rounded text-sm"
+            formaction="/users/{{ u.telegram_id }}/delete"
+            onclick="return confirm('Удалить @{{ u.username }}?');">×</button>
+    {% endif %}
+  </form>
+  {% endfor %}
+</div>
+
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+  <h2 class="text-lg font-semibold mb-3">Добавить юзера вручную</h2>
+  <p class="text-slate-400 text-sm mb-3">
+    Если хочешь чтобы кто-то ещё имел доступ - попроси его прислать свой Telegram ID
+    (через бота @userinfobot или похожего) и добавь его здесь.
+  </p>
+  <form method="post" action="/users" class="grid grid-cols-3 gap-3">
+    <input name="telegram_id" type="number" required placeholder="Telegram ID"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <input name="username" placeholder="username (без @)"
+           class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
+    <select name="role" class="bg-slate-900 border border-slate-700 rounded px-3 py-2">
+      <option value="editor">editor (только контент)</option>
+      <option value="admin">admin (всё)</option>
+    </select>
+    <button class="col-span-3 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Добавить</button>
+  </form>
+</div>
+{% endblock %}

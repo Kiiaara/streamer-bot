@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Травобот - админка{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="apple-touch-icon" href="/static/favicon.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.7/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  {% if user %}
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <span class="font-bold text-lg">Травобот</span>
+      <nav class="flex gap-3 text-sm flex-wrap">
+        {% for s in sections %}
+          <a href="/section/{{ s.name }}" class="px-3 py-1 rounded {% if s.name == current_section %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %} {% if s.hidden %}opacity-50 italic{% endif %}" {% if s.hidden %}title="Скрыт в боте"{% endif %}>{{ s.name }}{% if s.hidden %} 🚫{% endif %}</a>
+        {% endfor %}
+        {% if user.role == 'admin' %}
+          <span class="border-l border-slate-700 mx-2"></span>
+          <a href="/stats" class="px-3 py-1 rounded {% if active == 'stats' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Статистика</a>
+          <a href="/sections-manage" class="px-3 py-1 rounded {% if active == 'sections' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Разделы</a>
+          <a href="/greeting" class="px-3 py-1 rounded {% if active == 'greeting' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Приветствие</a>
+          <a href="/auto-comments" class="px-3 py-1 rounded {% if active == 'auto-comments' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Авто-комменты</a>
+          <a href="/channels" class="px-3 py-1 rounded {% if active == 'channels' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Каналы</a>
+          <a href="/users" class="px-3 py-1 rounded {% if active == 'users' %}bg-emerald-600 text-white{% else %}text-slate-300 hover:bg-slate-700{% endif %}">Юзеры</a>
+        {% endif %}
+      </nav>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="text-slate-400">@{{ user.username or user.first_name }} ({{ user.role }})</span>
+      <a href="/logout" class="text-slate-400 hover:text-white">Выйти</a>
+    </div>
+  </header>
+  {% endif %}
+  <main class="max-w-7xl mx-auto px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

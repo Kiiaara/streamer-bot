@@ -1,0 +1,51 @@
+services:
+  bot:
+    build: .
+    container_name: travobot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Credentials оставляем пока что для одноразовой миграции из Sheets
+      - ./credentials.json:/app/credentials.json:ro
+      # Картинки контента
+      - ./static:/app/static
+      # SQLite-БД (общий volume с админкой)
+      - ./data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - botnet
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    container_name: travobot-admin
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./static:/app/static
+      - ./data:/app/data
+    ports:
+      # Слушаем только на localhost - наружу пробросит nginx
+      - "127.0.0.1:9000:9000"
+    networks:
+      - botnet
+
+  redis:
+    image: redis:7-alpine
+    container_name: travobot-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - botnet
+
+volumes:
+  redis-data:
+
+networks:
+  botnet:
+    driver: bridge

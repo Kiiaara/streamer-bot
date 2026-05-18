@@ -1,0 +1,42 @@
+# Секреты - НИ В КОЕМ СЛУЧАЕ не коммитим
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+
+# Данные SQLite и картинки - живут только на сервере, в репо не нужны
+data/
+static/images/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Python мусор
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+logs/
+
+# Временные
+*.bak
+*.tmp

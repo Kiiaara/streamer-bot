@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}{% if is_new %}Новая запись{% else %}Редактирование{% endif %} — {{ current_section }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">
+    <a href="/section/{{ current_section }}" class="text-slate-400 hover:text-white">← {{ current_section }}</a>
+    <span class="mx-2 text-slate-500">/</span>
+    {% if is_new %}Новая запись{% else %}{{ item.title or 'Без названия' }}{% endif %}
+  </h1>
+</div>
+
+{# JSON-данные в отдельном script-теге как text/plain, безопасно для любых кавычек/спецсимволов #}
+{% set item_json = {
+  "section": current_section,
+  "title": item.title or "",
+  "url": item.url or "",
+  "category": item.category or "",
+  "subcategory": item.subcategory or "",
+  "keywords": item.keywords or "",
+  "image": item.image or "",
+  "description": item.description or "",
+  "button_text": item.button_text or "",
+  "hidden": item.hidden or false,
+} %}
+<script id="item-data" type="text/plain">{{ item_json|tojson }}</script>
+
+<form method="post" action="{% if is_new %}/item{% else %}/item/{{ item.id }}{% endif %}"
+      x-data="itemForm(JSON.parse(document.getElementById('item-data').textContent))"
+      class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <input type="hidden" name="section" :value="section" />
+  <input type="hidden" name="description" :value="description" />
+  <input type="hidden" name="image" :value="image" />
+  <input type="hidden" name="button_text" :value="button_text" />
+
+  <div class="space-y-4">
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Заголовок (что будет жирным)</label>
+      <input name="title" type="text" required maxlength="128"
+             x-model="title"
+             class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+    </div>
+
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Ссылка (URL) <span class="text-slate-600">(можно оставить пустой - тогда кнопки перехода в боте не будет, например для крипто-адреса в описании)</span></label>
+      <input name="url" type="url" maxlength="1024"
+             x-model="url"
+             class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+    </div>
+
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Текст кнопки перехода <span class="text-slate-600">(если пусто - будет «Перейти →»)</span></label>
+      <input type="text" maxlength="64" x-model="button_text"
+             placeholder="Перейти →"
+             class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Первая кнопка <span class="text-slate-600">(вложенный раздел)</span></label>
+        <input name="category" type="text" maxlength="64" x-model="category"
+               placeholder="Например: Telegram, Dota 2, Прокси"
+               class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Вторая кнопка <span class="text-slate-600">(второй уровень)</span></label>
+        <input name="subcategory" type="text" maxlength="64" x-model="subcategory"
+               placeholder="Например: Dota 2, Warhammer"
+               class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Ключевые слова (через запятую — для поиска)</label>
+      <input name="keywords" type="text" x-model="keywords"
+             class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 focus:outline-none focus:border-emerald-500" />
+    </div>
+
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Описание</label>
+      <div class="bg-slate-800 border border-slate-700 rounded">
+        <div class="flex flex-wrap gap-1 p-2 border-b border-slate-700 text-sm">
+          <button type="button" @click="exec('bold')" class="px-2 py-1 hover:bg-slate-700 rounded font-bold">B</button>
+          <button type="button" @click="exec('italic')" class="px-2 py-1 hover:bg-slate-700 rounded italic">I</button>
+          <button type="button" @click="exec('underline')" class="px-2 py-1 hover:bg-slate-700 rounded underline">U</button>
+          <button type="button" @click="exec('strikethrough')" class="px-2 py-1 hover:bg-slate-700 rounded line-through">S</button>
+          <button type="button" @click="exec('code')" class="px-2 py-1 hover:bg-slate-700 rounded font-mono">{ }</button>
+          <button type="button" @click="wrapSpoiler" class="px-2 py-1 hover:bg-slate-700 rounded">Спойлер</button>
+          <button type="button" @click="addLink" class="px-2 py-1 hover:bg-slate-700 rounded">🔗 Ссылка</button>
+          <div class="relative" @click.outside="emojiOpen = false">
+            <button type="button" @click="toggleEmoji" class="px-2 py-1 hover:bg-slate-700 rounded">😀 Эмодзи</button>
+            <div x-show="emojiOpen" x-cloak
+                 class="absolute z-50 mt-1 left-0 bg-slate-900 border border-slate-700 rounded-lg shadow-xl w-80 max-h-96 overflow-hidden flex flex-col">
+              <input type="text" x-model="emojiSearch" @input="filterEmoji" placeholder="Поиск..."
+                     class="w-full bg-slate-800 border-b border-slate-700 px-3 py-2 text-sm focus:outline-none" />
+              <div class="flex border-b border-slate-700 text-xs">
+                <template x-for="cat in emojiCategories" :key="cat.id">
+                  <button type="button" @click="emojiTab = cat.id; emojiSearch = ''; filterEmoji()"
+                          :class="emojiTab === cat.id ? 'bg-slate-700' : ''"
+                          class="flex-1 py-2 hover:bg-slate-800" x-text="cat.icon"></button>
+                </template>
+              </div>
+              <div class="overflow-y-auto p-2 flex-1 grid grid-cols-8 gap-1">
+                <template x-for="e in visibleEmoji" :key="e">
+                  <button type="button" @click="insertEmoji(e)"
+                          class="text-xl hover:bg-slate-700 rounded p-1" x-text="e"></button>
+                </template>
+              </div>
+            </div>
+          </div>
+          <button type="button" @click="clearFormat" class="px-2 py-1 hover:bg-slate-700 rounded ml-auto text-slate-500" title="Убрать форматирование">⌫</button>
+        </div>
+        <div x-ref="editor" contenteditable="true" @input="syncDescription"
+             class="min-h-[120px] p-3 focus:outline-none"
+             x-html="initialDescription"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">B / I / U / S / моноширинный / спойлер / ссылка / эмодзи — что поддерживает Telegram.</div>
+    </div>
+
+    <div>
+      <label class="block text-sm text-slate-400 mb-1">Картинка <span class="text-slate-600">(рекомендую 1280×720, до 5 МБ, JPG/PNG/WEBP)</span></label>
+      <div @drop.prevent="onDrop" @dragover.prevent
+           class="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center hover:border-slate-500 transition">
+        <template x-if="image">
+          <div class="space-y-2">
+            <img :src="'/uploads/' + image" class="max-h-40 mx-auto rounded" />
+            <div class="text-xs text-slate-500" x-text="image"></div>
+            <button type="button" @click="image = ''" class="text-red-400 text-sm hover:underline">Убрать картинку</button>
+          </div>
+        </template>
+        <template x-if="!image">
+          <div>
+            <div class="text-slate-500 text-sm mb-2">Перетащи файл сюда или</div>
+            <input type="file" accept="image/*" @change="onPick" class="hidden" x-ref="fileInput" />
+            <button type="button" @click="$refs.fileInput.click()"
+                    class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm">Выбрать файл</button>
+          </div>
+        </template>
+        <div x-show="uploading" class="text-emerald-400 text-sm mt-2">Загрузка...</div>
+        <div x-show="uploadError" x-text="uploadError" class="text-red-400 text-sm mt-2"></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-3">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" name="hidden" value="on" x-model="hidden"
+               class="w-5 h-5 rounded bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500" />
+        <div>
+          <div class="font-semibold">Скрыть запись в боте</div>
+          <div class="text-xs text-slate-400">Запись не будет видна юзерам, но останется в админке.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="flex items-center gap-3 pt-4 border-t border-slate-700">
+      <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded font-semibold">
+        {% if is_new %}Создать{% else %}Сохранить{% endif %}
+      </button>
+      <a href="/section/{{ current_section }}" class="text-slate-400 hover:text-white px-3 py-2">Отмена</a>
+    </div>
+  </div>
+
+  <div>
+    <div class="text-sm text-slate-400 mb-2">Превью (как увидит юзер в Telegram):</div>
+    <div class="bg-[#0e1621] border border-slate-700 rounded-2xl p-4 sticky top-4">
+      <div class="bg-[#182533] rounded-2xl rounded-tl-md p-3 max-w-md">
+        <template x-if="image">
+          <img :src="'/uploads/' + image" class="rounded-xl mb-2 w-full max-h-64 object-cover" />
+        </template>
+        <div class="text-white">
+          <template x-if="title">
+            <div class="font-bold mb-1" x-text="title"></div>
+          </template>
+          <div class="text-sm text-slate-200 [&_b]:font-bold [&_i]:italic [&_u]:underline [&_s]:line-through [&_code]:font-mono [&_code]:bg-slate-700 [&_code]:px-1 [&_code]:rounded" x-html="description"></div>
+        </div>
+        <div class="mt-3 space-y-1.5">
+          <button type="button" class="block w-full text-center bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-sm rounded py-1.5"
+                  x-text="button_text || 'Перейти →'"></button>
+          <button type="button" class="block w-full text-center bg-slate-700/40 text-slate-400 text-sm rounded py-1.5">← Назад</button>
+        </div>
+        <div class="text-right text-xs text-slate-500 mt-1">9:41</div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script src="/static/editor.js"></script>
+<script>
+function itemForm(initial) {
+  const safe = {
+    section: initial.section || '',
+    title: initial.title || '',
+    url: initial.url || '',
+    category: initial.category || '',
+    subcategory: initial.subcategory || '',
+    keywords: initial.keywords || '',
+    image: initial.image || '',
+    description: initial.description || '',
+    button_text: initial.button_text || '',
+    hidden: !!initial.hidden,
+  };
+  const base = baseEditor(safe.description);
+  return {
+    ...safe,
+    ...base,
+  };
+}
+</script>
+{% endblock %}
