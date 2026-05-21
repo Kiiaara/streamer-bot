@@ -14,8 +14,10 @@
         {% if not it.enabled %}<span class="bg-red-900 text-red-200 px-2 py-0.5 rounded ml-2 text-xs">выключен</span>{% endif %}
       </div>
     </summary>
+    {% set ac_json = {"image": it.image or ""} %}
+    <script id="ac-data-{{ it.chat_id }}" type="text/plain">{{ ac_json|tojson }}</script>
     <form method="post" action="/auto-comments" class="mt-4 space-y-3"
-          x-data="acForm({{ ({'image': it.image or ''})|tojson }})">
+          x-data="acForm(JSON.parse(document.getElementById('ac-data-{{ it.chat_id }}').textContent))">
       <input type="hidden" name="chat_id" value="{{ it.chat_id }}" />
       <input type="hidden" name="image" :value="image" />
       <div class="grid grid-cols-2 gap-3">
