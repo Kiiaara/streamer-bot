@@ -32,3 +32,4 @@ async def init_db():
         # Лёгкие миграции: добавляем колонки которых может не быть в старой БД
         await _ensure_column(conn, "sections", "hidden", "BOOLEAN", "0")
         await _ensure_column(conn, "content_items", "hidden", "BOOLEAN", "0")
+        await _ensure_column(conn, "auto_comments", "image", "VARCHAR(255)", "''")

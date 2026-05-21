@@ -57,6 +57,7 @@ class AutoComment(Base):
     topic: Mapped[str] = mapped_column(String(64), default="")
     text: Mapped[str] = mapped_column(Text, default="")  # HTML
     buttons_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON [{"title","url"}]
+    image: Mapped[str] = mapped_column(String(255), default="")  # имя файла в static/images/
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

@@ -45,6 +45,7 @@ class AutoComment:
     topic: str
     text: str
     buttons: list[tuple[str, str]] = field(default_factory=list)
+    image: str = ""
 
 
 @dataclass
@@ -145,6 +146,7 @@ class SheetsClient:
                 topic=r.topic or "",
                 text=r.text or "",
                 buttons=buttons,
+                image=(getattr(r, "image", "") or "").strip(),
             )
 
         channels = {

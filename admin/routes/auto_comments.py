@@ -49,6 +49,7 @@ async def list_auto_comments(request: Request, user: User = Depends(require_admi
             "topic": r.topic,
             "text": r.text,
             "buttons": _format_buttons(r.buttons_json),
+            "image": r.image or "",
             "enabled": r.enabled,
         }
         for r in rows
@@ -67,6 +68,7 @@ async def upsert_auto_comment(
     topic: str = Form(""),
     text: str = Form(""),
     buttons: str = Form(""),
+    image: str = Form(""),
     enabled: bool = Form(False),
     user: User = Depends(require_admin),
 ):
@@ -89,6 +91,7 @@ async def upsert_auto_comment(
                     topic=topic.strip(),
                     text=text,
                     buttons_json=buttons_json,
+                    image=image.strip(),
                     enabled=enabled,
                 ))
             else:
@@ -96,6 +99,7 @@ async def upsert_auto_comment(
                 existing.topic = topic.strip()
                 existing.text = text
                 existing.buttons_json = buttons_json
+                existing.image = image.strip()
                 existing.enabled = enabled
         else:
             s.add(AutoComment(
@@ -104,6 +108,7 @@ async def upsert_auto_comment(
                 topic=topic.strip(),
                 text=text,
                 buttons_json=buttons_json,
+                image=image.strip(),
                 enabled=enabled,
             ))
         await s.commit()

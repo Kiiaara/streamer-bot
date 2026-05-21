@@ -14,8 +14,10 @@
         {% if not it.enabled %}<span class="bg-red-900 text-red-200 px-2 py-0.5 rounded ml-2 text-xs">выключен</span>{% endif %}
       </div>
     </summary>
-    <form method="post" action="/auto-comments" class="mt-4 space-y-3">
+    <form method="post" action="/auto-comments" class="mt-4 space-y-3"
+          x-data="acForm({{ ({'image': it.image or ''})|tojson }})">
       <input type="hidden" name="chat_id" value="{{ it.chat_id }}" />
+      <input type="hidden" name="image" :value="image" />
       <div class="grid grid-cols-2 gap-3">
         <input name="name" value="{{ it.name }}" placeholder="Название (для тебя)"
                class="bg-slate-900 border border-slate-700 rounded px-3 py-2" />
@@ -31,6 +33,31 @@
                 class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm">{{ it.text }}</textarea>
       <textarea name="buttons" rows="3" placeholder="Кнопки - по одной в строке: Заголовок | https://url"
                 class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm">{{ it.buttons }}</textarea>
+
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Картинка <span class="text-slate-600">(если задана - коммент отправится как фото с подписью)</span></label>
+        <div @drop.prevent="onDrop" @dragover.prevent
+             class="border-2 border-dashed border-slate-700 rounded-lg p-3 text-center hover:border-slate-500 transition">
+          <template x-if="image">
+            <div class="space-y-2">
+              <img :src="'/uploads/' + image" class="max-h-40 mx-auto rounded" />
+              <div class="text-xs text-slate-500" x-text="image"></div>
+              <button type="button" @click="image = ''" class="text-red-400 text-sm hover:underline">Убрать</button>
+            </div>
+          </template>
+          <template x-if="!image">
+            <div>
+              <div class="text-slate-500 text-sm mb-2">Перетащи файл сюда или</div>
+              <input type="file" accept="image/*" @change="onPick" class="hidden" x-ref="fileInput" />
+              <button type="button" @click="$refs.fileInput.click()"
+                      class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm">Выбрать файл</button>
+            </div>
+          </template>
+          <div x-show="uploading" class="text-emerald-400 text-sm mt-2">Загрузка...</div>
+          <div x-show="uploadError" x-text="uploadError" class="text-red-400 text-sm mt-2"></div>
+        </div>
+      </div>
+
       <label class="flex items-center gap-2 text-sm">
         <input type="checkbox" name="enabled" value="true" {% if it.enabled %}checked{% endif %} />
         Включён
@@ -64,7 +91,33 @@
     <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded font-semibold" type="submit">Создать</button>
   </form>
 </div>
+<script src="/static/editor.js"></script>
 <script>
+  // Минимальная Alpine-обёртка только для drag-and-drop картинки
+  function acForm(initial) {
+    return {
+      image: initial.image || '',
+      uploading: false,
+      uploadError: '',
+      async onPick(e) { const f = e.target.files[0]; if (f) await this.upload(f); },
+      async onDrop(e) { const f = e.dataTransfer.files[0]; if (f) await this.upload(f); },
+      async upload(file) {
+        this.uploadError = ''; this.uploading = true;
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          const r = await fetch('/upload', {method: 'POST', body: fd});
+          if (!r.ok) {
+            const j = await r.json().catch(() => ({}));
+            this.uploadError = j.detail || 'Ошибка загрузки';
+          } else {
+            const j = await r.json(); this.image = j.filename;
+          }
+        } catch (e) { this.uploadError = 'Сеть недоступна'; }
+        finally { this.uploading = false; }
+      },
+    };
+  }
+
   const AC_KEY = 'admin:autocomments:open';
   let openSet = new Set(JSON.parse(localStorage.getItem(AC_KEY) || '[]'));
 
