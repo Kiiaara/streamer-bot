@@ -47,7 +47,8 @@ async def auto_forward_comment(msg: Message):
     try:
         # Отвечаем reply на пересланный пост, чтобы коммент привязался к нему
         if image_path:
-            await msg.reply_photo(FSInputFile(image_path), caption=cfg.text or None, reply_markup=kb)
+            from .photo_cache import send_photo_cached
+            await send_photo_cached(msg, image_path, caption=cfg.text or None, reply_markup=kb, method="reply_photo")
         else:
             await msg.reply(cfg.text, reply_markup=kb, disable_web_page_preview=True)
         log.info(f"Авто-коммент в '{cfg.name}' ({msg.chat.id})")

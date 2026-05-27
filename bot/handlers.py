@@ -120,11 +120,8 @@ async def _send_screen(cb: CallbackQuery, text: str, kb: InlineKeyboardMarkup, i
             await msg.delete()
         except Exception:
             pass
-        await msg.answer_photo(
-            FSInputFile(image_path),
-            caption=text[:1024],
-            reply_markup=kb,
-        )
+        from .photo_cache import send_photo_cached
+        await send_photo_cached(msg, image_path, caption=text[:1024], reply_markup=kb)
     else:
         if msg.photo:
             try:
