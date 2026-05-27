@@ -116,19 +116,37 @@ class Category(Base):
 
 
 class User(Base):
-    """Юзеры админки (не путать с юзерами Telegram-бота - тут только те у кого есть доступ к админке)."""
+    """Юзеры админки (не путать с юзерами Telegram-бота - тут только те у кого есть доступ к админке).
+
+    Поддерживаются 2 способа входа: TG Login Widget (telegram_id) и email + код.
+    Для email-only юзеров telegram_id = отрицательная заглушка (-1, -2, ...).
+    """
     __tablename__ = "users"
 
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), default="")
     first_name: Mapped[str] = mapped_column(String(128), default="")
     photo_url: Mapped[str] = mapped_column(String(512), default="")
+    email: Mapped[str] = mapped_column(String(255), default="", index=True)  # для email-входа
     role: Mapped[str] = mapped_column(String(16), default="editor")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     __table_args__ = (
         CheckConstraint("role IN ('admin','editor')", name="ck_users_role"),
     )
+
+
+class EmailCode(Base):
+    """Одноразовый код подтверждения email. TTL 5 минут, до 5 попыток ввода."""
+    __tablename__ = "email_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
 
 class AuditLog(Base):

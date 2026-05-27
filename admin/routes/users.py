@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from shared.db import async_session
 from shared.models import User
 
-from ..auth import require_admin
+from ..auth import normalize_email, require_admin
 from ..common import template_ctx, templates
 
 router = APIRouter()
@@ -24,26 +24,70 @@ async def list_users(request: Request, user: User = Depends(require_admin)):
 
 @router.post("/users")
 async def add_user(
-    telegram_id: int = Form(...),
+    telegram_id: str = Form(""),  # str чтоб допустить пустую строку при email-only добавлении
     username: str = Form(""),
+    email: str = Form(""),
     role: str = Form("editor"),
     user: User = Depends(require_admin),
 ):
     if role not in ("admin", "editor"):
-        raise HTTPException(status_code=400)
+        raise HTTPException(status_code=400, detail="Bad role")
+
+    email_norm = normalize_email(email) if email else ""
+    if email_norm and ("@" not in email_norm or "." not in email_norm):
+        raise HTTPException(status_code=400, detail="Некорректный email")
+
+    tg_id_int = None
+    if telegram_id and telegram_id.strip():
+        try:
+            tg_id_int = int(telegram_id.strip())
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Telegram ID должен быть числом")
+
+    if tg_id_int is None and not email_norm:
+        raise HTTPException(status_code=400, detail="Укажите Telegram ID или email")
+
     async with async_session() as s:
-        existing = (
-            await s.execute(select(User).where(User.telegram_id == telegram_id))
-        ).scalar_one_or_none()
-        if existing:
-            existing.role = role
-            existing.username = username.strip().lstrip("@").lower() or existing.username
+        # Если есть tg_id - ищем по нему (обновляем/создаём)
+        if tg_id_int is not None:
+            existing = (
+                await s.execute(select(User).where(User.telegram_id == tg_id_int))
+            ).scalar_one_or_none()
+            if existing:
+                existing.role = role
+                if username.strip():
+                    existing.username = username.strip().lstrip("@").lower()
+                if email_norm:
+                    existing.email = email_norm
+            else:
+                s.add(User(
+                    telegram_id=tg_id_int,
+                    username=username.strip().lstrip("@").lower(),
+                    email=email_norm,
+                    role=role,
+                ))
         else:
-            s.add(User(
-                telegram_id=telegram_id,
-                username=username.strip().lstrip("@").lower(),
-                role=role,
-            ))
+            # email-only - проверяем что email ещё не занят
+            existing_email = (
+                await s.execute(select(User).where(User.email == email_norm))
+            ).scalar_one_or_none()
+            if existing_email:
+                existing_email.role = role
+                if username.strip():
+                    existing_email.username = username.strip().lstrip("@").lower()
+            else:
+                # подбираем свободный отрицательный telegram_id
+                min_row = (await s.execute(
+                    select(User).where(User.telegram_id < 0).order_by(User.telegram_id.asc())
+                )).scalars().first()
+                next_id = (min_row.telegram_id - 1) if min_row else -1
+                s.add(User(
+                    telegram_id=next_id,
+                    username=username.strip().lstrip("@").lower(),
+                    email=email_norm,
+                    role=role,
+                    first_name=email_norm,
+                ))
         await s.commit()
     return RedirectResponse(url="/users", status_code=303)
 

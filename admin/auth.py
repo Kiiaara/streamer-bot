@@ -1,22 +1,101 @@
 """Telegram Login Widget авторизация + сессии через подписанные cookie + RBAC."""
 import hashlib
 import hmac
+import secrets
 import time
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from shared.db import async_session
-from shared.models import User
+from shared.models import EmailCode, User
 
 from .config import config
 
 SESSION_COOKIE = "travobot_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 дней
 TG_AUTH_MAX_AGE = 60 * 60 * 24       # 24 часа на принятие подписи
+EMAIL_CODE_TTL_MINUTES = 5
+EMAIL_CODE_MAX_ATTEMPTS = 5
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+def generate_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+async def find_user_by_email(email: str) -> Optional[User]:
+    async with async_session() as s:
+        return (
+            await s.execute(select(User).where(User.email == email))
+        ).scalar_one_or_none()
+
+
+async def create_email_code(email: str) -> str:
+    """Создаёт новый код, инвалидирует старые активные. Возвращает код для отправки."""
+    code = generate_code()
+    async with async_session() as s:
+        # инвалидируем старые активные коды
+        await s.execute(
+            update(EmailCode)
+            .where(
+                EmailCode.email == email,
+                EmailCode.used == False,
+                EmailCode.expires_at > datetime.now(),
+            )
+            .values(used=True)
+        )
+        s.add(EmailCode(
+            email=email,
+            code_hash=hash_code(code),
+            expires_at=datetime.now() + timedelta(minutes=EMAIL_CODE_TTL_MINUTES),
+        ))
+        await s.commit()
+    return code
+
+
+async def verify_email_code(email: str, code: str) -> None:
+    """Проверяет код. Бросает HTTPException с понятным сообщением если что-то не так."""
+    if not code.isdigit() or len(code) != 6:
+        raise HTTPException(status_code=400, detail="Код должен состоять из 6 цифр")
+
+    async with async_session() as s:
+        row = (
+            await s.execute(
+                select(EmailCode)
+                .where(EmailCode.email == email, EmailCode.used == False)
+                .order_by(EmailCode.id.desc())
+            )
+        ).scalars().first()
+
+        if not row:
+            raise HTTPException(status_code=400, detail="Код не найден или уже использован. Запросите новый.")
+        if row.expires_at < datetime.now():
+            raise HTTPException(status_code=410, detail="Срок действия кода истёк. Запросите новый.")
+        if row.attempts >= EMAIL_CODE_MAX_ATTEMPTS:
+            row.used = True
+            await s.commit()
+            raise HTTPException(status_code=429, detail="Слишком много неверных попыток. Запросите новый код.")
+
+        if row.code_hash != hash_code(code):
+            row.attempts += 1
+            await s.commit()
+            remaining = EMAIL_CODE_MAX_ATTEMPTS - row.attempts
+            raise HTTPException(status_code=400, detail=f"Неверный код. Осталось попыток: {remaining}")
+
+        row.used = True
+        await s.commit()
 
 _signer = URLSafeTimedSerializer(config.admin_secret, salt="travobot-session")
 

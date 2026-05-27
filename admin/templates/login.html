@@ -1,19 +1,160 @@
 {% extends "base.html" %}
-{% block title %}Вход — Травобот{% endblock %}
+{% block title %}Вход - Травобот{% endblock %}
 {% block content %}
 <div class="min-h-[80vh] flex items-center justify-center">
   <div class="bg-slate-800 border border-slate-700 rounded-2xl p-10 max-w-md w-full text-center">
     <div class="text-3xl mb-2">Травобот</div>
     <div class="text-slate-400 mb-8">Админка контента</div>
-    <div class="flex justify-center my-6">
-      <script async src="https://telegram.org/js/telegram-widget.js?22"
-        data-telegram-login="{{ bot_username }}"
-        data-size="large"
-        data-radius="10"
-        data-auth-url="{{ auth_url }}"
-        data-request-access="write"></script>
+
+    {# Email login (основной способ - работает без VPN) #}
+    <div id="emailStep">
+      <form id="emailForm" class="flex flex-col gap-3">
+        <input
+          type="email"
+          name="email"
+          placeholder="your@email.com"
+          required
+          autocomplete="email"
+          class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+        />
+        <button
+          type="submit"
+          class="bg-emerald-600 hover:bg-emerald-500 transition rounded-lg px-4 py-3 font-semibold"
+        >Получить код</button>
+      </form>
+      <div class="text-slate-500 text-sm mt-4">Код придёт на почту, действителен 5 минут.</div>
     </div>
-    <div class="text-slate-500 text-sm">Доступ только по whitelist Telegram username.</div>
+
+    <div id="codeStep" style="display:none">
+      <div class="text-slate-300 mb-4">Код отправлен на<br><b id="emailLabel"></b></div>
+      <form id="codeForm" class="flex flex-col gap-3">
+        <input
+          id="codeInput"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          placeholder="000000"
+          required
+          autocomplete="one-time-code"
+          class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-2xl font-bold tracking-[8px] text-center text-slate-100 focus:outline-none focus:border-emerald-500"
+        />
+        <button
+          type="submit"
+          class="bg-emerald-600 hover:bg-emerald-500 transition rounded-lg px-4 py-3 font-semibold"
+        >Войти</button>
+        <button
+          type="button"
+          id="backBtn"
+          class="text-slate-400 hover:text-slate-200 text-sm"
+        >Другой email</button>
+      </form>
+      <div class="text-slate-500 text-sm mt-4">Не пришло? Проверьте папку "Спам".</div>
+    </div>
+
+    <div id="errBox" class="text-rose-400 text-sm mt-4" style="display:none"></div>
+
+    {# Опционально: TG-вход (если бот привязан и работает без РКН-блока) #}
+    {% if bot_username %}
+    <details class="mt-8 text-left">
+      <summary class="text-slate-500 text-sm cursor-pointer text-center">или войти через Telegram</summary>
+      <div class="flex justify-center my-4">
+        <script async src="https://telegram.org/js/telegram-widget.js?22"
+          data-telegram-login="{{ bot_username }}"
+          data-size="large"
+          data-radius="10"
+          data-auth-url="{{ auth_url }}"
+          data-request-access="write"></script>
+      </div>
+    </details>
+    {% endif %}
   </div>
 </div>
+
+<script>
+const emailStep = document.getElementById('emailStep');
+const codeStep = document.getElementById('codeStep');
+const emailForm = document.getElementById('emailForm');
+const codeForm = document.getElementById('codeForm');
+const codeInput = document.getElementById('codeInput');
+const emailLabel = document.getElementById('emailLabel');
+const errBox = document.getElementById('errBox');
+const backBtn = document.getElementById('backBtn');
+let currentEmail = '';
+
+function showErr(msg) {
+  errBox.textContent = msg;
+  errBox.style.display = 'block';
+}
+function clearErr() {
+  errBox.style.display = 'none';
+}
+
+emailForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearErr();
+  const email = emailForm.email.value.trim().toLowerCase();
+  if (!email.includes('@') || !email.includes('.')) {
+    showErr('Введите корректный email');
+    return;
+  }
+  try {
+    const r = await fetch('/auth/email/request', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email}),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showErr(data.detail || 'Не удалось отправить код');
+      return;
+    }
+    currentEmail = email;
+    emailLabel.textContent = email;
+    emailStep.style.display = 'none';
+    codeStep.style.display = 'block';
+    setTimeout(() => codeInput.focus(), 50);
+  } catch (err) {
+    showErr('Ошибка сети');
+  }
+});
+
+codeForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearErr();
+  const code = codeInput.value.replace(/\D/g, '');
+  if (code.length !== 6) {
+    showErr('Код должен быть из 6 цифр');
+    return;
+  }
+  try {
+    const r = await fetch('/auth/email/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: currentEmail, code}),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      showErr(data.detail || 'Неверный код');
+      return;
+    }
+    // успех - переходим на главную (или next)
+    const params = new URLSearchParams(window.location.search);
+    window.location.href = params.get('next') || '/';
+  } catch (err) {
+    showErr('Ошибка сети');
+  }
+});
+
+backBtn.addEventListener('click', () => {
+  codeStep.style.display = 'none';
+  emailStep.style.display = 'block';
+  codeInput.value = '';
+  clearErr();
+});
+
+codeInput.addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+});
+</script>
 {% endblock %}
