@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    extra_hosts:
+      # РКН режет часть подсетей TG; форсим IP который точно живой
+      - "api.telegram.org:149.154.167.220"
     volumes:
       # Credentials оставляем пока что для одноразовой миграции из Sheets
       - ./credentials.json:/app/credentials.json:ro
