@@ -1,148 +1,321 @@
-# Травобот
+# 🤖 Streamer Bot
 
-Telegram-бот для каналов стримера: меню в личке (Сайт/Соцсети/Гайды/Игры/Сервисы/Ставки),
-свободные вопросы с AI-поиском через Groq, авто-комменты в группах обсуждения каналов.
+Multi-channel Telegram bot with integrated web admin panel for content management. Serves menu items (Site/Social/Guides/Games/Services/Betting), AI-powered search via Groq, and auto-comments in discussion groups.
 
-Один бот - много каналов. Контент в Google Sheets, правишь в браузере, бот сам подхватывает.
+**Key Features:**
+- 📚 Multi-channel support with shared content database
+- 🎮 Content organized by sections and categories
+- 🔍 Hybrid AI search (keyword + semantic)
+- 💬 Auto-comments in channel discussion groups
+- 🎛️ Web admin panel for content management
+- ⚡ Redis caching (5-minute TTL)
+- 🐳 Docker compose deployment
 
-## Стек
-- Python 3.12 + aiogram 3
-- Google Sheets (gspread) - база контента
-- Redis - кеш FSM
-- Groq (бесплатный) - AI-поиск
-- Docker compose - развёртывание
+---
 
-## Структура
+## 🏗️ Tech Stack
+
+- **Bot:** Python 3.12 + aiogram 3
+- **Admin Panel:** Flask (Python)
+- **Database:** SQLite / PostgreSQL
+- **Cache:** Redis
+- **AI Search:** Groq LLM (free tier)
+- **Deployment:** Docker Compose
+
+---
+
+## 📦 Project Structure
+
 ```
 streamer-bot/
-  bot/
-    main.py           # точка входа
-    config.py         # загрузка .env
-    sheets.py         # gspread + кеш
-    keyboards.py      # генерация меню
-    handlers.py       # личка, кнопки, AI-поиск
-    auto_comments.py  # авто-комменты в группах обсуждения
-    search.py         # гибридный поиск (ключевые слова + Groq)
-  Dockerfile
-  docker-compose.yml
-  requirements.txt
-  .env.example
+├── bot/
+│   ├── main.py              # aiogram entry point
+│   ├── config.py            # .env configuration
+│   ├── handlers.py          # Telegram handlers
+│   ├── keyboards.py         # Menu generation
+│   ├── search.py            # Hybrid search (keyword + AI)
+│   ├── auto_comments.py     # Discussion group logic
+│   └── utils.py             # helpers
+├── admin/
+│   ├── main.py              # Flask app entry
+│   ├── auth.py              # Login/auth
+│   ├── routes/              # API routes
+│   ├── templates/           # HTML templates
+│   └── static/              # CSS/JS
+├── shared/
+│   ├── db.py                # SQLAlchemy models
+│   ├── models.py            # Pydantic schemas
+│   └── email_sender.py      # Notifications
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── .env.example
+└── LICENSE
 ```
 
-## Настройка - пошагово
+---
 
-### 1. Google Sheets
+## 🚀 Quick Start
 
-1. Создай таблицу: https://sheets.new
-2. Назови её "Травобот - контент"
-3. Создай 4 листа (внизу): `Контент`, `АвтоКомменты`, `Каналы`, `Настройки`
-4. Шапки колонок (первая строка):
+### 1. Prerequisites
 
-**Лист `Контент`:**
-| section | category | title | url | description | keywords |
+- Python 3.12+
+- Docker & Docker Compose
+- Telegram bot token (from @BotFather)
+- Groq API key (free at https://console.groq.com)
 
-- `section` - один из: Сайт, Соцсети, Гайды, Игры, Сервисы, Ставки
-- `category` - подкатегория (для Игр: Dota 2/Warhammer/Civilization 5/Warcraft, для Сервисов: Прокси/ТравоСтим/Травобустер). Для разделов без подкатегорий оставь пустым.
-- `title` - текст кнопки
-- `url` - ссылка
-- `description` - короткое описание для AI-поиска (например "VPN-прокси для обхода блокировок")
-- `keywords` - ключевые слова через запятую для быстрого поиска (например "прокси, vpn, заблокирован, не открывается")
-
-**Лист `АвтоКомменты`:**
-| chat_id | название | тематика | текст | кнопки |
-
-- `chat_id` - id группы обсуждения канала (отрицательное число, например `-1001234567890`)
-- `название` - для тебя, например "Сосиска Травомана"
-- `тематика` - dota / warhammer / warcraft / civ5 / bets_dota / bets_football
-- `текст` - что бот напишет первым комментом
-- `кнопки` - формат: `Текст1|url1;;Текст2|url2;;Текст3|url3` (разделитель кнопок `;;`, между текстом и url одна `|`)
-
-**Лист `Каналы`** (опционально, для тематического меню в чатах):
-| chat_id | название | привязка_к_категории |
-
-- `привязка_к_категории` - "Dota 2" / "Warhammer" / "все" - какой раздел показывать в этом чате
-
-**Лист `Настройки`:**
-| ключ | значение |
-
-Например: `greeting` = "Привет! Я Травобот..."
-
-### 2. Service Account для Google API
-
-1. Заходи на https://console.cloud.google.com
-2. Создай новый проект (или используй существующий)
-3. Включи **Google Sheets API**: меню "APIs & Services" → "Library" → ищи "Google Sheets API" → Enable
-4. Создай service account: "APIs & Services" → "Credentials" → "Create credentials" → "Service account"
-   - Имя любое, например `travobot-sheets`
-   - Роль не выбирай (нам не нужны права в проекте)
-5. Открой созданный service account → вкладка "Keys" → "Add key" → "Create new key" → JSON → скачается файл
-6. Переименуй скачанный файл в `credentials.json`
-7. Скопируй email service-аккаунта (вида `travobot-sheets@xxx.iam.gserviceaccount.com`)
-8. В Google Sheets таблице нажми "Поделиться" → вставь этот email → права "Читатель"
-
-### 3. Groq API
-
-1. https://console.groq.com → войди (бесплатно)
-2. API Keys → Create API Key → скопируй (начинается с `gsk_`)
-
-### 4. Telegram-бот
-
-Уже создан у @BotFather, токен у тебя. Если ещё нет:
-- `/newbot` → имя `Травобот` → username `xxxxx_bot`
-- Сохрани токен
-
-### 5. Развёртывание на VPS
-
-На своей VPS (Ubuntu, AEZA):
+### 2. Local Setup
 
 ```bash
-# Перенести проект на сервер (через scp, git, или WinSCP)
-# Допустим залил в /opt/travobot
+# Clone and install
+git clone https://github.com/kiiaara/streamer-bot.git
+cd streamer-bot
 
-cd /opt/travobot
-
-# Скопировать .env.example в .env и заполнить
+# Copy config template
 cp .env.example .env
+
+# Edit .env with your values
 nano .env
-# Вставить: BOT_TOKEN, SHEETS_ID (из URL таблицы), GROQ_API_KEY
+# Required:
+# - BOT_TOKEN (from @BotFather)
+# - GROQ_API_KEY (from console.groq.com)
+# - DATABASE_URL (sqlite:///./db/bot.db for local)
+# - REDIS_URL (redis://localhost:6379/0)
 
-# Положить credentials.json рядом с docker-compose.yml
-# (тот файл который скачали с Google Cloud)
+# Python env
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-# Запустить
-docker compose up -d --build
+# Database
+flask db upgrade
 
-# Логи
-docker compose logs -f bot
+# Run bot (terminal 1)
+python bot/main.py
+
+# Run admin panel (terminal 2)
+flask run --port 8000
 ```
 
-`SHEETS_ID` берётся из URL таблицы: `docs.google.com/spreadsheets/d/<ВОТ_ЭТО>/edit`
+Admin panel: http://localhost:8000  
+Bot logs: check console output
 
-### 6. Подключение бота к каналам (авто-комменты)
+### 3. Docker Deployment
 
-Для каждого канала где нужны авто-комменты:
+```bash
+# Build and run
+docker compose up -d --build
 
-1. Открой группу обсуждения канала (не сам канал, а привязанный к нему чат)
-2. Добавь Травобота в группу
-3. Сделай его админом с правом "Отправлять сообщения"
-4. Узнай `chat_id` группы обсуждения:
-   - Самый простой способ: добавь в группу @getmyid_bot или @username_to_id_bot, он покажет id чата
-   - Либо напиши /menu в группе - в логах бота (`docker compose logs bot`) будет виден id
-5. Впиши строку в лист `АвтоКомменты` Google-таблицы
-6. Через 5 минут (или `/reload` в личке боту) бот подхватит настройку
-7. Старого бота в этой группе - **сними права админа** (не удаляй, на случай отката)
+# View logs
+docker compose logs -f bot
+docker compose logs -f admin
 
-### 7. Управление контентом
+# Stop
+docker compose down
+```
 
-Просто редактируй Google Sheets - бот подхватит изменения через 5 минут.
-Хочешь сразу - напиши боту в личку `/reload`.
+---
 
-## Команды бота
-- `/start` - приветствие + главное меню
-- `/menu` - меню (в любом чате)
-- `/reload` - сброс кеша Sheets (после правок)
+## 🎛️ Admin Panel
 
-## Замена старых ботов
+Access at `http://localhost:8000` (or `https://admin.yourdomain.com` in production)
 
-Стратегия: **снимаем права у старых, не удаляем**. Если новый бот ляжет - вернёшь старых одним кликом.
-Через неделю стабильной работы Травобота - старых можно прибить совсем.
+**Features:**
+- 📝 Content CRUD (posts, categories, sections)
+- 🏷️ Section management (Сайт, Игры, Сервисы, etc.)
+- 🎮 Category organization (Dota 2, Warhammer, etc.)
+- ⚙️ Auto-comment configuration per discussion group
+- 📊 Statistics dashboard
+- 👤 User management (role-based access)
+- 🔧 Settings editor
+
+**Database Schema:**
+- `posts` - content items (title, url, description, keywords)
+- `sections` - main categories
+- `categories` - subcategories
+- `auto_comments` - discussion group configs
+- `channels` - channel metadata
+- `users` - admin accounts
+- `settings` - global configuration
+
+---
+
+## 🤖 Bot Commands
+
+- `/start` - Show main menu
+- `/menu` - Display menu (in any chat)
+- `/reload` - Refresh cache (after admin edits)
+
+---
+
+## 🔍 Content Management Workflow
+
+### Admin Creates Content
+
+1. Open admin panel → Login
+2. Sections → Add/Edit section (e.g., "Игры")
+3. Categories → Add category under section (e.g., "Dota 2")
+4. Items → Add content item (title, URL, description, keywords)
+5. Save → Redis cache invalidates automatically
+6. Next user `/start` → sees fresh content
+
+### User Navigates Menu
+
+1. Send `/start` to bot
+2. Bot loads sections from cache/database
+3. User clicks section button (e.g., "Игры")
+4. Bot shows categories (Dota 2, Warhammer, etc.)
+5. User clicks category → sees items with inline buttons
+6. User can search with text → bot uses AI search
+
+### AI Search
+
+User sends: "где найти гайд по доте?"
+- Bot sends query to Groq LLM
+- Searches database for similar descriptions/keywords
+- Returns top 3-5 results as buttons
+
+---
+
+## 📋 Configuration
+
+### Environment Variables
+
+```bash
+# Telegram Bot
+BOT_TOKEN=123456789:ABCdef...
+TELEGRAM_BOT_USERNAME=YourBotName
+
+# Admin Panel
+ADMIN_SECRET=random_64_char_string
+
+# Database
+DATABASE_URL=sqlite:///./db/bot.db
+# OR: postgresql://user:pass@host/dbname
+
+# Cache
+REDIS_URL=redis://redis:6379/0
+
+# AI Search
+GROQ_API_KEY=gsk_...
+
+# Logging
+LOG_LEVEL=INFO
+```
+
+---
+
+## 🚀 Production Deployment
+
+### Docker Stack
+
+```yaml
+services:
+  redis:
+    image: redis:7
+  
+  bot:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://...
+      - REDIS_URL=redis://redis:6379/0
+    depends_on: [redis]
+  
+  admin:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [redis]
+```
+
+### VPS Setup (Ubuntu)
+
+```bash
+# SSH into VPS, clone repo
+git clone https://github.com/kiiaara/streamer-bot.git
+cd streamer-bot
+
+# Setup
+cp .env.example .env
+nano .env  # fill in production values
+
+# Deploy with systemd or Docker
+docker compose -f docker-compose.yml up -d
+
+# Enable auto-restart
+docker compose up -d --restart unless-stopped
+```
+
+### HTTPS (Admin Panel)
+
+Use Nginx reverse proxy + Let's Encrypt:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name admin.yourdomain.com;
+    
+    location / {
+        proxy_pass http://localhost:8000;
+    }
+}
+```
+
+---
+
+## 🔐 Security
+
+✅ Admin password: bcrypt hashed  
+✅ HTTPS recommended for admin  
+✅ Input sanitization (HTML + SQL)  
+✅ CSRF protection (Flask-WTF)  
+✅ Rate limiting on login attempts  
+⚠️ Backup database regularly  
+⚠️ Rotate bot token if compromised  
+
+---
+
+## 📊 Monitoring
+
+```bash
+# Bot logs
+docker compose logs -f bot
+
+# Admin logs
+docker compose logs -f admin
+
+# Database queries
+sqlite3 db/bot.db "SELECT COUNT(*) FROM posts;"
+
+# Redis health
+docker compose exec redis redis-cli DBSIZE
+```
+
+---
+
+## 📖 Documentation
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design, data flows, schemas
+- [LICENSE](LICENSE) - MIT License
+
+---
+
+## 🔮 Future Enhancements
+
+- [ ] Content versioning (rollback)
+- [ ] Bulk import from CSV
+- [ ] Content approval workflow
+- [ ] Advanced analytics (charts, retention)
+- [ ] Mobile admin app
+- [ ] Webhook notifications (Slack alerts)
+- [ ] Export to Google Sheets (backup)
+
+---
+
+## 📝 License
+
+MIT - see [LICENSE](LICENSE) file
+
+---
+
+**Author:** Kiiaara  
+**Status:** Active Development
